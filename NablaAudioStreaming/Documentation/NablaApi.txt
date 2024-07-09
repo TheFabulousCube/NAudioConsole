@@ -1,0 +1,749 @@
+Listen Transcription WebSocket API 
+Listen Transcription WebSocket API takes audio streams of your encounters and returns a live transcription.
+
+ 🏇Show me some code
+
+We've published a JavaScript example of how you can integrate the /listen-ws API on a web page.
+
+General specifications
+All messages sent and received via websockets are encoded as UTF-8 JSON text frames.
+We don't keep any of your data beyond the websocket lifecycle. So to be network-resilient, we recommend you store what is relevant for you to be back on track in case of untimely closure.
+Authentication
+Get an authentication token, details in Authentication. It can be a Server API Key or a user's Access-Token depending on whether you are calling the Server API or the User API.
+We support two different ways of specifying the authentication token:
+The recommended way: You pass your bearer authentication token as an Authorization header when initiating the websocket.
+
+Example:
+
+url: 'wss://api.nabla.com/v1/copilot-api/server/listen-ws',
+protocol: 'copilot-listen-protocol',
+extra_headers: { 'Authorization': 'Bearer <YOUR_TOKEN>' }
+An alternative way, especially when specifying extra headers is not supported by your websocket client (e.g. from web browsers), is to pass the token as a second websocket protocol prefixed with jwt-.
+
+Example:
+
+url: 'wss://api.nabla.com/v1/copilot-api/user/listen-ws',
+protocols: ['copilot-listen-protocol', 'jwt-<YOUR_TOKEN>']
+Servers
+wss://api.nabla.com/v1/copilot-api/serverWSSSERVER API
+Called from your servers, authenticated with a server key.
+
+wss://api.nabla.com/v1/copilot-api/userWSSUSER API
+Called from front-end apps, authenticated with a user-scoped access token.
+
+Operations
+PUB /listen-ws
+Copilot Listen WebSocket API takes audio streams of your encounters and returns a live transcription.
+
+Each of the audio streams you declare in the configuration will expect audio chunks to flow continuously (even if silent), if a stream does not receive any audio chunk for 10 seconds the websocket will fail with a timeout error (code: 83011).
+
+Example communication:
+
+You: Open the websocket specifying an authorization token.
+You: Send a first message setting the configuration.
+You: continuously send small audio chunks for each stream.
+Copilot: continuously computes and sends transcript items.
+You: stop streaming audio and immediately send a { "object": "end" }.
+Copilot: finishes processing audio and pushes any ongoing transcript item to a final state.
+Copilot: closes the websocket.
+You: filter-out non-final transcript items and sort them by start_offset_ms before calling the note-generation API.
+Stream your encounter's audio by sending small chunks from each speaker.
+
+Channel specific informationWSSCollapse all
+headersCollapse all
+Object
+Some websocket clients only support the Sec-WebSocket-Protocol header, so we suggest an alternative way of specifying your authentication header. See Authentication section above.
+
+Sec-WebSocket-Protocol
+String
+WebSocket Sub-protocol header, as per the RFC 6455.
+
+Allowed values: "copilot-listen-protocol"
+Authorization
+String
+Your authentication token (server key or user access token) prefixed by Bearer . To get one, check Authentication.
+
+Additional properties are allowed.
+
+Accepts one of the following messages:
+
+#0listen_config
+Initiates the listening feature with the given configuration.
+
+This should be your first message in the websocket.
+
+PayloadCollapse all
+Objectuid: listen_config
+First message to configure transcription and note generation (audio format, language, etc).
+
+object
+required
+String
+Allowed values: "listen_config"
+output_objectsCollapse all
+required
+Array<String>
+Items:
+String
+Specifies which items you want us to send you back. Currently only transcription (i.e. transcript_item) is supported.
+
+Allowed values: "transcript_item"
+streamsCollapse all
+required
+Array<Object>
+Describe the audio streams you intend to stream as input of the Listen API. Typically, if you have separate doctor/patient audio tracks (or do diarization yourself) you will configure two streams for transcription. Remember that a stream will expect audio to flow continuously, otherwise a timeout error will be thrown.
+
+id
+required
+String
+Give an identifier to this stream.
+
+speaker_type
+required
+String
+Who said the text in this transcript item.
+
+Allowed values: "doctor""patient""unspecified"
+encoding
+required
+String
+Encoding of the streamed audio.
+
+Allowed values: "pcm_s16le"
+sample_rate
+required
+Integer
+Sample rate of submitted streaming audio, in hertz.
+
+language
+required
+String
+Language of the transcript and the note ('fr' and 'en' are deprecated, and correspond to 'fr-FR' and 'en-US' respectively. Generating a note in 'es-ES' and 'es-MX' is not supported and will be soon removed).
+
+Allowed values: "fr""en""en-US""en-GB""fr-FR""es-ES""es-MX"
+split_by_sentence
+Boolean
+Indicates whether to segment transcription results at sentence boundaries. Default is false, meaning that a single transcript item may encompass multiple sentences, provided they are not delineated by pauses (silence) in the audio.
+
+Default value:false
+enable_audio_chunk_ack
+Boolean
+Experimental feature, please contact us to opt-in.
+
+If enabled, audio chunks should contain a seq_id, and the server will periodically send acknowledgements up to the specified seq_id.
+
+Default value:false
+Additional properties are allowed.
+
+Examples
+Payload
+{
+  "object": "listen_config",
+  "output_objects": [
+    "transcript_item"
+  ],
+  "encoding": "pcm_s16le",
+  "sample_rate": 16000,
+  "language": "en-US",
+  "streams": [
+    {
+      "id": "doctor_stream",
+      "speaker_type": "doctor"
+    },
+    {
+      "id": "patient_stream",
+      "speaker_type": "patient"
+    }
+  ],
+  "split_by_sentence": true
+}
+This example has been generated automatically.
+#1audio_chunk
+A chunk of an audio track from the encounter.
+
+Chunk (little portion) of a single audio track from the encounter. Maximum allowed duration is 1 second, recommended is 100ms.
+
+PayloadCollapse all
+Objectuid: audio_chunk
+object
+required
+String
+Allowed values: "audio_chunk"
+payload
+required
+String
+Raw audio chunk in base64 string.
+
+stream_id
+required
+String
+Identifier of one of the streams you defined in streams in the configuration.
+
+seq_id
+Integer
+Experimental feature, please contact us to opt-in. A unique identifier for this audio chunk within its stream, expected to be sequential (n+1) from one audio chunk to the next. First value (i.e. for the first audio chunk of a stream) can start at any arbitrary value. This field is required if you enabled the audio chunk acknowledgement protocol in the configuration.
+
+Additional properties are allowed.
+
+Examples
+Payload
+{
+  "object": "audio_chunk",
+  "payload": "ZXhhbXBsZQ==",
+  "stream_id": "doctor_stream",
+  "seq_id": 0
+}
+This example has been generated automatically.
+#2end
+End the streaming.
+
+Signal the end of streaming and ask the Copilot to finish what is still in progress (e.g. gives a final state to the latest transcript item).
+
+PayloadCollapse all
+Objectuid: end
+object
+required
+String
+Allowed values: "end"
+Additional properties are allowed.
+
+Examples
+Payload
+{
+  "object": "end"
+}
+This example has been generated automatically.
+SUB /listen-ws
+Copilot Listen WebSocket API takes audio streams of your encounters and returns a live transcription.
+
+Each of the audio streams you declare in the configuration will expect audio chunks to flow continuously (even if silent), if a stream does not receive any audio chunk for 10 seconds the websocket will fail with a timeout error (code: 83011).
+
+Example communication:
+
+You: Open the websocket specifying an authorization token.
+You: Send a first message setting the configuration.
+You: continuously send small audio chunks for each stream.
+Copilot: continuously computes and sends transcript items.
+You: stop streaming audio and immediately send a { "object": "end" }.
+Copilot: finishes processing audio and pushes any ongoing transcript item to a final state.
+Copilot: closes the websocket.
+You: filter-out non-final transcript items and sort them by start_offset_ms before calling the note-generation API.
+Receive the live transcription.
+
+Channel specific informationWSSCollapse all
+headersCollapse all
+Object
+Some websocket clients only support the Sec-WebSocket-Protocol header, so we suggest an alternative way of specifying your authentication header. See Authentication section above.
+
+Sec-WebSocket-Protocol
+String
+WebSocket Sub-protocol header, as per the RFC 6455.
+
+Allowed values: "copilot-listen-protocol"
+Authorization
+String
+Your authentication token (server key or user access token) prefixed by Bearer . To get one, check Authentication.
+
+Additional properties are allowed.
+
+Accepts one of the following messages:
+
+#0transcript_item
+A transcript item.
+
+A portion of the transcript being generated. Typically, the currently being spoken sentence transcribed from the last transmitted audio chunks. This might be an incomplete sentence since we keep transcribing as audio chunks are received. You should patch the previously received transcript item with the same id until is_final is true.
+
+PayloadCollapse all
+Objectuid: transcript_item
+object
+required
+String
+Allowed values: "transcript_item"
+id
+required
+Stringformat: uuid
+A unique identifier.
+
+text
+required
+String
+The transcribed text.
+
+speaker
+required
+String
+Who said the text in this transcript item.
+
+Allowed values: "doctor""patient""unspecified"
+start_offset_ms
+required
+Integer
+The initial point of the audio segment that this transcript entry represents, measured in milliseconds from the start of the audio stream.
+
+end_offset_ms
+required
+Integer
+The concluding point of the audio segment that this transcript entry represents, measured in milliseconds from the start of the audio stream.
+
+In other words: this basically equals start_time_ms plus the duration of the audio segment that this transcript entry represents (regardless of how it was chunked).
+
+is_final
+required
+Boolean
+Indicates if this is the final version of the transcript item.
+
+Additional properties are allowed.
+
+Examples
+Payload
+{
+  "object": "transcript_item",
+  "id": "98FCE1EF-DBCA-41EF-8BC7-4D1621AC07C6",
+  "text": "Also, I’m allergic to peanuts.",
+  "speaker": "doctor",
+  "start_offset_ms": 65100,
+  "end_offset_ms": 69300,
+  "is_final": true
+}
+This example has been generated automatically.
+#1audio_chunk_ack
+Acknowledgement for audio chunks up to the specified sequential id.
+
+Experimental feature, please contact us to opt-in.
+
+When enabled in the configuration, server will regularly send audio chunks acknowledgement to signal receipt and imminent transcription of audio.
+
+Clients should consider acknowledged audio as processed and delete it from their buffer.
+
+Moreover, audio acknowledgement is intended to set the pace for streaming speed: Clients should refrain from sending new audio chunks until acknowledgement is received for previous ones. Server will accept up to 10 seconds of not-yet-acknowledged audio: clients going further will face an "audio chunks buffer overflow" error.
+
+PayloadCollapse all
+Objectuid: audio_chunk_ack
+Experimental feature, please contact us to opt-in.
+
+Acknowledgement of audio receipt by the server up to the audio chunk with the sequential id ack_id.
+
+object
+required
+String
+Allowed values: "audio_chunk_ack"
+stream_id
+required
+String
+ID of the stream to which the ack-ed chunk belongs.
+
+ack_id
+required
+Integer
+The sequential id of the audio chunk up to which this acknowledgment applies.
+
+Additional properties are allowed.
+
+Examples
+Payload
+{
+  "object": "audio_chunk_ack",
+  "stream_id": "patient_stream",
+  "ack_id": 42
+}
+This example has been generated automatically.
+#2error_message
+An error message.
+
+An error message sent right before closing the websocket due to a fatal error. It explains shortly what went wrong.
+
+PayloadCollapse all
+Objectuid: error_message
+object
+required
+String
+Allowed values: "error_message"
+message
+required
+String
+The error message.
+
+Additional properties are allowed.
+
+Examples
+Payload
+{
+  "object": "error_message",
+  "message": "Unable to parse JSON at path $.language"
+}
+This example has been generated automatically.
+Messages
+#1listen_config
+Initiates the listening feature with the given configuration.
+
+This should be your first message in the websocket.
+
+PayloadCollapse all
+Objectuid: listen_config
+First message to configure transcription and note generation (audio format, language, etc).
+
+object
+required
+String
+Allowed values: "listen_config"
+output_objectsCollapse all
+required
+Array<String>
+Items:
+String
+Specifies which items you want us to send you back. Currently only transcription (i.e. transcript_item) is supported.
+
+Allowed values: "transcript_item"
+streamsCollapse all
+required
+Array<Object>
+Describe the audio streams you intend to stream as input of the Listen API. Typically, if you have separate doctor/patient audio tracks (or do diarization yourself) you will configure two streams for transcription. Remember that a stream will expect audio to flow continuously, otherwise a timeout error will be thrown.
+
+id
+required
+String
+Give an identifier to this stream.
+
+speaker_type
+required
+String
+Who said the text in this transcript item.
+
+Allowed values: "doctor""patient""unspecified"
+encoding
+required
+String
+Encoding of the streamed audio.
+
+Allowed values: "pcm_s16le"
+sample_rate
+required
+Integer
+Sample rate of submitted streaming audio, in hertz.
+
+language
+required
+String
+Language of the transcript and the note ('fr' and 'en' are deprecated, and correspond to 'fr-FR' and 'en-US' respectively. Generating a note in 'es-ES' and 'es-MX' is not supported and will be soon removed).
+
+Allowed values: "fr""en""en-US""en-GB""fr-FR""es-ES""es-MX"
+split_by_sentence
+Boolean
+Indicates whether to segment transcription results at sentence boundaries. Default is false, meaning that a single transcript item may encompass multiple sentences, provided they are not delineated by pauses (silence) in the audio.
+
+Default value:false
+enable_audio_chunk_ack
+Boolean
+Experimental feature, please contact us to opt-in.
+
+If enabled, audio chunks should contain a seq_id, and the server will periodically send acknowledgements up to the specified seq_id.
+
+Default value:false
+Additional properties are allowed.
+
+#2audio_chunk
+A chunk of an audio track from the encounter.
+
+Chunk (little portion) of a single audio track from the encounter. Maximum allowed duration is 1 second, recommended is 100ms.
+
+PayloadCollapse all
+Objectuid: audio_chunk
+object
+required
+String
+Allowed values: "audio_chunk"
+payload
+required
+String
+Raw audio chunk in base64 string.
+
+stream_id
+required
+String
+Identifier of one of the streams you defined in streams in the configuration.
+
+seq_id
+Integer
+Experimental feature, please contact us to opt-in. A unique identifier for this audio chunk within its stream, expected to be sequential (n+1) from one audio chunk to the next. First value (i.e. for the first audio chunk of a stream) can start at any arbitrary value. This field is required if you enabled the audio chunk acknowledgement protocol in the configuration.
+
+Additional properties are allowed.
+
+#3end
+End the streaming.
+
+Signal the end of streaming and ask the Copilot to finish what is still in progress (e.g. gives a final state to the latest transcript item).
+
+PayloadCollapse all
+Objectuid: end
+object
+required
+String
+Allowed values: "end"
+Additional properties are allowed.
+
+#4transcript_item
+A transcript item.
+
+A portion of the transcript being generated. Typically, the currently being spoken sentence transcribed from the last transmitted audio chunks. This might be an incomplete sentence since we keep transcribing as audio chunks are received. You should patch the previously received transcript item with the same id until is_final is true.
+
+PayloadCollapse all
+Objectuid: transcript_item
+object
+required
+String
+Allowed values: "transcript_item"
+id
+required
+Stringformat: uuid
+A unique identifier.
+
+text
+required
+String
+The transcribed text.
+
+speaker
+required
+String
+Who said the text in this transcript item.
+
+Allowed values: "doctor""patient""unspecified"
+start_offset_ms
+required
+Integer
+The initial point of the audio segment that this transcript entry represents, measured in milliseconds from the start of the audio stream.
+
+end_offset_ms
+required
+Integer
+The concluding point of the audio segment that this transcript entry represents, measured in milliseconds from the start of the audio stream.
+
+In other words: this basically equals start_time_ms plus the duration of the audio segment that this transcript entry represents (regardless of how it was chunked).
+
+is_final
+required
+Boolean
+Indicates if this is the final version of the transcript item.
+
+Additional properties are allowed.
+
+#5audio_chunk_ack
+Acknowledgement for audio chunks up to the specified sequential id.
+
+Experimental feature, please contact us to opt-in.
+
+When enabled in the configuration, server will regularly send audio chunks acknowledgement to signal receipt and imminent transcription of audio.
+
+Clients should consider acknowledged audio as processed and delete it from their buffer.
+
+Moreover, audio acknowledgement is intended to set the pace for streaming speed: Clients should refrain from sending new audio chunks until acknowledgement is received for previous ones. Server will accept up to 10 seconds of not-yet-acknowledged audio: clients going further will face an "audio chunks buffer overflow" error.
+
+PayloadCollapse all
+Objectuid: audio_chunk_ack
+Experimental feature, please contact us to opt-in.
+
+Acknowledgement of audio receipt by the server up to the audio chunk with the sequential id ack_id.
+
+object
+required
+String
+Allowed values: "audio_chunk_ack"
+stream_id
+required
+String
+ID of the stream to which the ack-ed chunk belongs.
+
+ack_id
+required
+Integer
+The sequential id of the audio chunk up to which this acknowledgment applies.
+
+Additional properties are allowed.
+
+#6error_message
+An error message.
+
+An error message sent right before closing the websocket due to a fatal error. It explains shortly what went wrong.
+
+PayloadCollapse all
+Objectuid: error_message
+object
+required
+String
+Allowed values: "error_message"
+message
+required
+String
+The error message.
+
+Additional properties are allowed.
+
+Schemas
+listen_configCollapse all
+Objectuid: listen_config
+First message to configure transcription and note generation (audio format, language, etc).
+
+object
+required
+String
+Allowed values: "listen_config"
+output_objectsCollapse all
+required
+Array<String>
+Items:
+String
+Specifies which items you want us to send you back. Currently only transcription (i.e. transcript_item) is supported.
+
+Allowed values: "transcript_item"
+streamsCollapse all
+required
+Array<Object>
+Describe the audio streams you intend to stream as input of the Listen API. Typically, if you have separate doctor/patient audio tracks (or do diarization yourself) you will configure two streams for transcription. Remember that a stream will expect audio to flow continuously, otherwise a timeout error will be thrown.
+
+id
+required
+String
+Give an identifier to this stream.
+
+speaker_type
+required
+String
+Who said the text in this transcript item.
+
+Allowed values: "doctor""patient""unspecified"
+encoding
+required
+String
+Encoding of the streamed audio.
+
+Allowed values: "pcm_s16le"
+sample_rate
+required
+Integer
+Sample rate of submitted streaming audio, in hertz.
+
+language
+required
+String
+Language of the transcript and the note ('fr' and 'en' are deprecated, and correspond to 'fr-FR' and 'en-US' respectively. Generating a note in 'es-ES' and 'es-MX' is not supported and will be soon removed).
+
+Allowed values: "fr""en""en-US""en-GB""fr-FR""es-ES""es-MX"
+split_by_sentence
+Boolean
+Indicates whether to segment transcription results at sentence boundaries. Default is false, meaning that a single transcript item may encompass multiple sentences, provided they are not delineated by pauses (silence) in the audio.
+
+Default value:false
+enable_audio_chunk_ack
+Boolean
+Experimental feature, please contact us to opt-in.
+
+If enabled, audio chunks should contain a seq_id, and the server will periodically send acknowledgements up to the specified seq_id.
+
+Default value:false
+Additional properties are allowed.
+
+audio_chunkCollapse all
+Objectuid: audio_chunk
+object
+required
+String
+Allowed values: "audio_chunk"
+payload
+required
+String
+Raw audio chunk in base64 string.
+
+stream_id
+required
+String
+Identifier of one of the streams you defined in streams in the configuration.
+
+seq_id
+Integer
+Experimental feature, please contact us to opt-in. A unique identifier for this audio chunk within its stream, expected to be sequential (n+1) from one audio chunk to the next. First value (i.e. for the first audio chunk of a stream) can start at any arbitrary value. This field is required if you enabled the audio chunk acknowledgement protocol in the configuration.
+
+Additional properties are allowed.
+
+endCollapse all
+Objectuid: end
+object
+required
+String
+Allowed values: "end"
+Additional properties are allowed.
+
+transcript_itemCollapse all
+Objectuid: transcript_item
+object
+required
+String
+Allowed values: "transcript_item"
+id
+required
+Stringformat: uuid
+A unique identifier.
+
+text
+required
+String
+The transcribed text.
+
+speaker
+required
+String
+Who said the text in this transcript item.
+
+Allowed values: "doctor""patient""unspecified"
+start_offset_ms
+required
+Integer
+The initial point of the audio segment that this transcript entry represents, measured in milliseconds from the start of the audio stream.
+
+end_offset_ms
+required
+Integer
+The concluding point of the audio segment that this transcript entry represents, measured in milliseconds from the start of the audio stream.
+
+In other words: this basically equals start_time_ms plus the duration of the audio segment that this transcript entry represents (regardless of how it was chunked).
+
+is_final
+required
+Boolean
+Indicates if this is the final version of the transcript item.
+
+Additional properties are allowed.
+
+audio_chunk_ackCollapse all
+Objectuid: audio_chunk_ack
+Experimental feature, please contact us to opt-in.
+
+Acknowledgement of audio receipt by the server up to the audio chunk with the sequential id ack_id.
+
+object
+required
+String
+Allowed values: "audio_chunk_ack"
+stream_id
+required
+String
+ID of the stream to which the ack-ed chunk belongs.
+
+ack_id
+required
+Integer
+The sequential id of the audio chunk up to which this acknowledgment applies.
+
+Additional properties are allowed.
+
+error_messageCollapse all
+Objectuid: error_message
+object
+required
+String
+Allowed values: "error_message"
+message
+required
+String
+The error message.
+
+Additional properties are allowed.

@@ -1,0 +1,82 @@
+Received message: {
+    "message": "83011 - COPILOT_AUDIO_STREAM_IDLE_TIMEOUT: Timout waiting for audio. Audio should flow continuously, please check docs.nabla.com.",
+    "object": "error_message"
+}
+WebSocket closed.Received message: {
+    "message": "83011 - COPILOT_AUDIO_STREAM_IDLE_TIMEOUT: Timout waiting for audio. Audio should flow continuously, please check docs.nabla.com.",
+    "object": "error_message"
+}
+WebSocket closed.
+
+I think the event driven WebSocket4Net is easier, but I can do a wrapper around ClientWebSocket.
+I can use NAudio for Windows, platform specific examples in Platform Specific.txt.
+I'll need to continuously send data even when there's no audio, until a stop button is clicked.
+
+Press any key to stop...
+WebSocket error: You must send data by websocket after websocket is opened!
+WebSocket error: You must send data by websocket after websocket is opened!
+WebSocket error: You must send data by websocket after websocket is opened!
+WebSocket opened.
+Received message: {
+    "id": "7b926993-c28d-4bb8-89dc-fe6a4c87e823",
+    "text": "Well let's",
+    "speaker": "doctor",
+    "start_offset_ms": 1410,
+    "end_offset_ms": 2240,
+    "is_final": false,
+    "object": "transcript_item"
+}
+Received message: {
+    "id": "7b926993-c28d-4bb8-89dc-fe6a4c87e823",
+    "text": "Well let's try",
+    "speaker": "doctor",
+    "start_offset_ms": 1410,
+    "end_offset_ms": 2520,
+    "is_final": false,
+    "object": "transcript_item"
+}
+Received message: {
+    "id": "7b926993-c28d-4bb8-89dc-fe6a4c87e823",
+    "text": "Well let's try this",
+    "speaker": "doctor",
+    "start_offset_ms": 1410,
+    "end_offset_ms": 2880,
+    "is_final": false,
+    "object": "transcript_item"
+}
+Received message: {
+    "id": "7b926993-c28d-4bb8-89dc-fe6a4c87e823",
+    "text": "Well let's try this can we get",
+    "speaker": "doctor",
+    "start_offset_ms": 1410,
+    "end_offset_ms": 3880,
+    "is_final": false,
+    "object": "transcript_item"
+}
+Received message: {
+    "id": "7b926993-c28d-4bb8-89dc-fe6a4c87e823",
+    "text": "Well, let's try this.",
+    "speaker": "doctor",
+    "start_offset_ms": 1410,
+    "end_offset_ms": 3191,
+    "is_final": true,
+    "object": "transcript_item"
+}
+Received message: {
+    "id": "7b926993-c28d-4bb8-0407-9f6b9be280c2",
+    "text": "Can we get?",
+    "speaker": "doctor",
+    "start_offset_ms": 3276,
+    "end_offset_ms": 4210,
+    "is_final": true,
+    "object": "transcript_item"
+}
+Received message: {
+    "id": "e06f155d-c1c4-45dd-9314-1f55dbd248d4",
+    "text": "A transcription",
+    "speaker": "doctor",
+    "start_offset_ms": 6280,
+    "end_offset_ms": 7040,
+    "is_final": false,
+    "object": "transcript_item"
+}

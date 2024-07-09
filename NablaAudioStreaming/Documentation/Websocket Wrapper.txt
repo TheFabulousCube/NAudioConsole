@@ -1,0 +1,48 @@
+Unfortunately, the ClientWebSocket class in .NET does not natively support events like Opened, MessageReceived, Error, and Closed. 
+However, you can create your own wrapper class around ClientWebSocket to simulate these events.
+
+Here's a basic example of how you might do this:
+
+public class MyWebSocket
+{
+    private ClientWebSocket _clientWebSocket = new ClientWebSocket();
+
+    public event Action Opened;
+    public event Action<string> MessageReceived;
+    public event Action<Exception> Error;
+    public event Action Closed;
+
+    public async Task ConnectAsync(Uri uri)
+    {
+        await _clientWebSocket.ConnectAsync(uri, CancellationToken.None);
+        Opened?.Invoke();
+        StartListening();
+    }
+
+    private async void StartListening()
+    {
+        var buffer = new ArraySegment<byte>(new byte[8192]);
+        try
+        {
+            while (_clientWebSocket.State == WebSocketState.Open)
+            {
+                var result = await _clientWebSocket.ReceiveAsync(buffer, CancellationToken.None);
+                var message = Encoding.UTF8.GetString(buffer.Array, 0, result.Count);
+                MessageReceived?.Invoke(message);
+            }
+        }
+        catch (Exception ex)
+        {
+            Error?.Invoke(ex);
+        }
+        finally
+        {
+            Closed?.Invoke();
+        }
+    }
+}
+
+In this code, MyWebSocket wraps ClientWebSocket and provides its own events. 
+When ConnectAsync is called, it connects the underlying ClientWebSocket and then invokes the Opened event. 
+It also starts a loop to listen for incoming messages. When a message is received, it invokes the MessageReceived event. 
+If an error occurs, it invokes the Error event. When the connection is closed, it invokes the Closed event.
